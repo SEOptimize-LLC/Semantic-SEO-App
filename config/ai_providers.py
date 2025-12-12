@@ -2,8 +2,134 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from pydantic import BaseModel
+
+
+def get_ai_client() -> Optional[Any]:
+    """
+    Get an OpenAI-compatible client for the configured AI provider.
+    
+    Returns an OpenAI client configured for the selected provider,
+    or None if no provider is configured.
+    
+    All providers use the OpenAI SDK format for compatibility.
+    """
+    from config.settings import get_settings
+    
+    settings = get_settings()
+    
+    # Determine which provider to use based on available API keys
+    provider = settings.ai.default_provider
+    api_key = settings.get_api_key(provider)
+    
+    # If default provider has no key, try others
+    if not api_key:
+        for p in ["openrouter", "openai", "anthropic", "google"]:
+            key = settings.get_api_key(p)
+            if key:
+                provider = p
+                api_key = key
+                break
+    
+    if not api_key:
+        return None
+    
+    # Import OpenAI SDK
+    try:
+        from openai import OpenAI
+    except ImportError:
+        raise ImportError(
+            "openai package is required. Install with: pip install openai"
+        )
+    
+    # Configure client based on provider
+    provider_config = AI_PROVIDERS.get(provider)
+    if not provider_config:
+        return None
+    
+    base_url = provider_config.base_url
+    
+    # Special handling for different providers
+    if provider == "openrouter":
+        return OpenAI(
+            api_key=api_key,
+            base_url=base_url,
+            default_headers={
+                "HTTP-Referer": "https://semantic-seo-platform.streamlit.app",
+                "X-Title": "Semantic SEO Platform"
+            }
+        )
+    elif provider == "anthropic":
+        # Anthropic uses their own SDK, but we can use OpenAI format
+        # via their OpenAI-compatible endpoint
+        return OpenAI(
+            api_key=api_key,
+            base_url="https://api.anthropic.com/v1",
+        )
+    elif provider == "google":
+        # Google requires special handling
+        # For now, recommend using OpenRouter for Google models
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=api_key)
+            # Return a wrapper that mimics OpenAI interface
+            return GoogleAIWrapper(api_key)
+        except ImportError:
+            return None
+    else:
+        # OpenAI or other OpenAI-compatible providers
+        return OpenAI(
+            api_key=api_key,
+            base_url=base_url if base_url else None,
+        )
+
+
+class GoogleAIWrapper:
+    """Wrapper to make Google AI API compatible with OpenAI interface."""
+    
+    def __init__(self, api_key: str):
+        import google.generativeai as genai
+        genai.configure(api_key=api_key)
+        self.genai = genai
+    
+    @property
+    def chat(self):
+        return self
+    
+    @property
+    def completions(self):
+        return self
+    
+    def create(self, model: str, messages: list, **kwargs):
+        """Create a chat completion using Google AI."""
+        # Convert OpenAI message format to Google format
+        model_instance = self.genai.GenerativeModel(model)
+        
+        # Build conversation
+        chat = model_instance.start_chat(history=[])
+        
+        # Get the last user message
+        last_message = ""
+        for msg in messages:
+            if msg["role"] == "user":
+                last_message = msg["content"]
+            elif msg["role"] == "system":
+                # Prepend system message to user message
+                last_message = msg["content"] + "\n\n" + last_message
+        
+        response = chat.send_message(last_message)
+        
+        # Return OpenAI-compatible response format
+        class Choice:
+            def __init__(self, text):
+                self.message = type('obj', (object,), {'content': text})()
+        
+        class Response:
+            def __init__(self, text):
+                self.choices = [Choice(text)]
+        
+        return Response(response.text)
 
 
 class ModelConfig(BaseModel):
