@@ -64,6 +64,79 @@ This platform is based on Koray's Semantic SEO framework, which focuses on:
 
 ---
 
+## ☁️ Streamlit Cloud Deployment
+
+Deploy this app for free on Streamlit Cloud in minutes!
+
+### Step 1: Fork/Clone Repository
+
+1. Go to https://github.com/SEOptimize-LLC/Semantic-SEO-App
+2. Fork the repository to your GitHub account
+
+### Step 2: Deploy on Streamlit Cloud
+
+1. Go to [share.streamlit.io](https://share.streamlit.io)
+2. Click "New app"
+3. Connect your GitHub account
+4. Select your forked repository
+5. Set the main file path to `app.py`
+6. Click "Deploy!"
+
+### Step 3: Configure Secrets (API Keys)
+
+**This is the most important step!** Configure your API keys securely:
+
+1. In your deployed app, click **"Manage app"** (bottom right)
+2. Click **"Settings"** → **"Secrets"**
+3. Add your secrets in TOML format:
+
+```toml
+# Required: At least one AI provider
+OPENROUTER_API_KEY = "sk-or-v1-your-key-here"
+
+# Optional: Additional AI providers
+OPENAI_API_KEY = "sk-your-openai-key"
+ANTHROPIC_API_KEY = "sk-ant-your-anthropic-key"
+GOOGLE_API_KEY = "your-google-ai-key"
+
+# Optional: Default settings
+DEFAULT_AI_PROVIDER = "openrouter"
+DEFAULT_MODEL = "anthropic/claude-3-sonnet"
+
+# Optional: SERP analysis
+SERPER_API_KEY = "your-serper-key"
+
+# Optional: Cloud sync
+SUPABASE_URL = "https://your-project.supabase.co"
+SUPABASE_KEY = "your-supabase-anon-key"
+```
+
+4. Click **"Save"** - your app will restart with the new secrets
+
+### Secrets Reference
+
+| Secret Key | Required | Description |
+|------------|----------|-------------|
+| `OPENROUTER_API_KEY` | ⭐ At least one | [OpenRouter](https://openrouter.ai) - Access multiple models |
+| `OPENAI_API_KEY` | ⭐ At least one | [OpenAI](https://platform.openai.com) - GPT models |
+| `ANTHROPIC_API_KEY` | ⭐ At least one | [Anthropic](https://console.anthropic.com) - Claude models |
+| `GOOGLE_API_KEY` | ⭐ At least one | [Google AI](https://makersuite.google.com) - Gemini models |
+| `DEFAULT_AI_PROVIDER` | Optional | `openrouter`, `openai`, `anthropic`, or `google` |
+| `DEFAULT_MODEL` | Optional | Model ID for default provider |
+| `SERPER_API_KEY` | Optional | [Serper](https://serper.dev) - SERP analysis |
+| `SUPABASE_URL` | Optional | [Supabase](https://supabase.com) - Cloud database sync |
+| `SUPABASE_KEY` | Optional | Supabase anon key |
+| `DEBUG_MODE` | Optional | `true` or `false` |
+
+### Important Notes
+
+- **Secrets are encrypted** and never exposed in your code
+- The app reads secrets automatically via `st.secrets`
+- Database persists in `/data/` during the session
+- For permanent data, configure Supabase cloud sync
+
+---
+
 ## 🔑 API Keys Required
 
 At minimum, you need **one AI provider** configured:

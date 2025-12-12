@@ -1,4 +1,10 @@
-"""Application settings and configuration management."""
+"""Application settings and configuration management.
+
+Supports configuration from multiple sources (in priority order):
+1. Streamlit Secrets (st.secrets) - for Streamlit Cloud deployment
+2. Environment Variables (.env) - for local development
+3. Default values
+"""
 
 from __future__ import annotations
 
@@ -12,6 +18,47 @@ from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+
+
+def get_secret(key: str, default: Optional[str] = None) -> Optional[str]:
+    """
+    Get a secret value from Streamlit secrets or environment variables.
+    
+    Priority:
+    1. Streamlit secrets (st.secrets) - for cloud deployment
+    2. Environment variables - for local development
+    3. Default value
+    
+    Args:
+        key: The secret key to look up
+        default: Default value if not found
+    
+    Returns:
+        The secret value or default
+    """
+    # Try Streamlit secrets first (works in Streamlit Cloud)
+    try:
+        import streamlit as st
+        if hasattr(st, 'secrets'):
+            # Check nested structure (e.g., st.secrets.api_keys.OPENROUTER_API_KEY)
+            if 'api_keys' in st.secrets and key in st.secrets.api_keys:
+                return st.secrets.api_keys[key]
+            # Check flat structure (e.g., st.secrets.OPENROUTER_API_KEY)
+            if key in st.secrets:
+                return st.secrets[key]
+    except Exception:
+        pass  # Not running in Streamlit or secrets not configured
+    
+    # Fall back to environment variable
+    return os.getenv(key, default)
+
+
+def get_secret_bool(key: str, default: bool = False) -> bool:
+    """Get a boolean secret value."""
+    value = get_secret(key)
+    if value is None:
+        return default
+    return value.lower() in ('true', '1', 'yes', 'on')
 
 
 class AISettings(BaseModel):
@@ -81,31 +128,36 @@ class Settings(BaseModel):
     
     @classmethod
     def from_env(cls) -> "Settings":
-        """Create settings from environment variables."""
+        """
+        Create settings from Streamlit secrets or environment variables.
+        
+        Streamlit secrets take priority over environment variables,
+        allowing secure configuration in Streamlit Cloud.
+        """
         return cls(
-            debug=os.getenv("DEBUG_MODE", "false").lower() == "true",
+            debug=get_secret_bool("DEBUG_MODE", False),
             ai=AISettings(
-                openrouter_api_key=os.getenv("OPENROUTER_API_KEY"),
-                openai_api_key=os.getenv("OPENAI_API_KEY"),
-                anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
-                google_api_key=os.getenv("GOOGLE_API_KEY"),
-                default_provider=os.getenv("DEFAULT_AI_PROVIDER", "openrouter"),
-                default_model=os.getenv("DEFAULT_MODEL", "anthropic/claude-3-sonnet"),
+                openrouter_api_key=get_secret("OPENROUTER_API_KEY"),
+                openai_api_key=get_secret("OPENAI_API_KEY"),
+                anthropic_api_key=get_secret("ANTHROPIC_API_KEY"),
+                google_api_key=get_secret("GOOGLE_API_KEY"),
+                default_provider=get_secret("DEFAULT_AI_PROVIDER", "openrouter"),
+                default_model=get_secret("DEFAULT_MODEL", "anthropic/claude-3-sonnet"),
             ),
             database=DatabaseSettings(
-                path=os.getenv("DATABASE_PATH", "data/semantic_seo.db"),
+                path=get_secret("DATABASE_PATH", "data/semantic_seo.db"),
             ),
             export=ExportSettings(
-                path=os.getenv("EXPORT_PATH", "data/exports"),
+                path=get_secret("EXPORT_PATH", "data/exports"),
             ),
             gsc=GSCSettings(
-                credentials_path=os.getenv("GSC_CREDENTIALS_PATH"),
+                credentials_path=get_secret("GSC_CREDENTIALS_PATH"),
             ),
             cloud_sync=CloudSyncSettings(
-                enabled=os.getenv("SUPABASE_URL") is not None or os.getenv("FIREBASE_PROJECT_ID") is not None,
-                supabase_url=os.getenv("SUPABASE_URL"),
-                supabase_key=os.getenv("SUPABASE_KEY"),
-                firebase_project_id=os.getenv("FIREBASE_PROJECT_ID"),
+                enabled=get_secret("SUPABASE_URL") is not None or get_secret("FIREBASE_PROJECT_ID") is not None,
+                supabase_url=get_secret("SUPABASE_URL"),
+                supabase_key=get_secret("SUPABASE_KEY"),
+                firebase_project_id=get_secret("FIREBASE_PROJECT_ID"),
             ),
         )
     
