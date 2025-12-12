@@ -274,7 +274,7 @@ class EntityAttribute(Base):
         primary_key=True
     )
     relationship_type: Mapped[Optional[str]] = mapped_column(String(50))
-    metadata: Mapped[Optional[Dict]] = mapped_column(JSON)
+    extra_data: Mapped[Optional[Dict]] = mapped_column(JSON)
     
     # Relationships
     entity: Mapped["Entity"] = relationship(
@@ -290,7 +290,7 @@ class EntityAttribute(Base):
             "entity_id": self.entity_id,
             "attribute_id": self.attribute_id,
             "relationship_type": self.relationship_type,
-            "metadata": self.metadata,
+            "extra_data": self.extra_data,
         }
 
 
