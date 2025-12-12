@@ -240,49 +240,342 @@ def render_project_selector():
 
 
 def render_create_project_form():
-    """Render the create project form."""
+    """Render the AI-powered Business Discovery Wizard."""
     from modules.project.service import ProjectService
     
-    st.markdown("### New Project")
+    st.markdown("### 🧙‍♂️ New Project - Business Discovery Wizard")
+    st.markdown(
+        "*Tell us about your business and we'll automatically generate "
+        "the SEO strategy framework for you!*"
+    )
     
-    with st.form("create_project_form"):
+    # Check if AI is configured
+    settings = get_settings()
+    has_ai = settings.has_any_ai_provider()
+    
+    # Initialize wizard state
+    if "wizard_step" not in st.session_state:
+        st.session_state.wizard_step = 1
+    if "wizard_data" not in st.session_state:
+        st.session_state.wizard_data = {}
+    if "generated_framework" not in st.session_state:
+        st.session_state.generated_framework = None
+    
+    # Step indicator
+    if has_ai:
+        steps = ["📝 Business Info", "🤖 AI Analysis", "✅ Review & Create"]
+        current_step = st.session_state.wizard_step
+        cols = st.columns(len(steps))
+        for i, (col, step) in enumerate(zip(cols, steps), 1):
+            with col:
+                if i < current_step:
+                    st.markdown(f"✓ ~~{step}~~")
+                elif i == current_step:
+                    st.markdown(f"**→ {step}**")
+                else:
+                    st.markdown(f"○ {step}")
+        st.markdown("---")
+    
+    # STEP 1: Collect business information
+    if st.session_state.wizard_step == 1:
+        render_wizard_step1(has_ai)
+    
+    # STEP 2: AI generates framework
+    elif st.session_state.wizard_step == 2:
+        render_wizard_step2()
+    
+    # STEP 3: Review and create project
+    elif st.session_state.wizard_step == 3:
+        render_wizard_step3()
+    
+    # Cancel button (always visible)
+    st.markdown("---")
+    if st.button("❌ Cancel", use_container_width=False):
+        # Reset wizard state
+        st.session_state.wizard_step = 1
+        st.session_state.wizard_data = {}
+        st.session_state.generated_framework = None
+        st.session_state.show_create_project = False
+        st.rerun()
+
+
+def render_wizard_step1(has_ai: bool):
+    """Step 1: Collect basic business information."""
+    st.markdown("#### Step 1: Tell us about your business")
+    st.markdown(
+        "Answer these simple questions - no SEO knowledge required!"
+    )
+    
+    # Business name (required)
+    business_name = st.text_input(
+        "What's the name of your business/website?*",
+        value=st.session_state.wizard_data.get("business_name", ""),
+        placeholder="e.g., TechVisa Solutions, Sarah's Skincare, etc."
+    )
+    
+    # Business description
+    business_description = st.text_area(
+        "What does your business do? (1-2 sentences)",
+        value=st.session_state.wizard_data.get("business_description", ""),
+        placeholder="Example: We help tech professionals relocate to Germany "
+                    "by handling their visa applications and paperwork.",
+        height=80
+    )
+    
+    # Products/Services
+    products_services = st.text_area(
+        "What products or services do you offer?",
+        value=st.session_state.wizard_data.get("products_services", ""),
+        placeholder="Example: Visa consultation, document preparation, "
+                    "relocation guides, 1-on-1 coaching calls",
+        height=80
+    )
+    
+    # Target customers
+    target_customers = st.text_input(
+        "Who are your ideal customers?",
+        value=st.session_state.wizard_data.get("target_customers", ""),
+        placeholder="Example: Software developers and engineers wanting "
+                    "to work in Germany"
+    )
+    
+    # How they make money
+    monetization = st.text_input(
+        "How does your business make money?",
+        value=st.session_state.wizard_data.get("monetization", ""),
+        placeholder="Example: Service fees for visa consultations and "
+                    "document packages"
+    )
+    
+    # Optional: Website URL
+    with st.expander("Optional: Additional Information"):
+        website_url = st.text_input(
+            "Website URL (if you have one)",
+            value=st.session_state.wizard_data.get("website_url", ""),
+            placeholder="https://example.com"
+        )
+        additional_context = st.text_area(
+            "Anything else we should know?",
+            value=st.session_state.wizard_data.get("additional_context", ""),
+            placeholder="e.g., We're expanding to France next year, "
+                        "we focus on senior roles only, etc.",
+            height=60
+        )
+    
+    # Save data to session state
+    st.session_state.wizard_data.update({
+        "business_name": business_name,
+        "business_description": business_description,
+        "products_services": products_services,
+        "target_customers": target_customers,
+        "monetization": monetization,
+        "website_url": website_url if 'website_url' in dir() else "",
+        "additional_context": (
+            additional_context if 'additional_context' in dir() else ""
+        ),
+    })
+    
+    # Navigation buttons
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if not has_ai:
+            st.warning(
+                "⚠️ No AI provider configured. "
+                "Go to Settings to add an API key for AI-powered analysis."
+            )
+    
+    with col2:
+        if business_name:
+            if has_ai:
+                if st.button(
+                    "🤖 Generate SEO Framework →",
+                    type="primary",
+                    use_container_width=True
+                ):
+                    st.session_state.wizard_step = 2
+                    st.rerun()
+            else:
+                # Skip to manual entry if no AI
+                if st.button(
+                    "Continue (Manual Entry) →",
+                    type="primary",
+                    use_container_width=True
+                ):
+                    st.session_state.wizard_step = 3
+                    st.rerun()
+        else:
+            st.button(
+                "Please enter business name first",
+                disabled=True,
+                use_container_width=True
+            )
+
+
+def render_wizard_step2():
+    """Step 2: AI generates the framework."""
+    st.markdown("#### Step 2: AI Analysis")
+    st.markdown("*Our AI is analyzing your business to create your SEO strategy...*")
+    
+    # Show a spinner while generating
+    with st.spinner("🤖 Analyzing business and generating framework..."):
+        try:
+            from modules.discovery.service import (
+                generate_framework_from_business_info
+            )
+            
+            data = st.session_state.wizard_data
+            result = generate_framework_from_business_info(
+                business_name=data.get("business_name", ""),
+                business_description=data.get("business_description", ""),
+                products_services=data.get("products_services", ""),
+                target_customers=data.get("target_customers", ""),
+                monetization=data.get("monetization", ""),
+                website_url=data.get("website_url", ""),
+                additional_context=data.get("additional_context", ""),
+            )
+            
+            st.session_state.generated_framework = result
+            st.session_state.wizard_step = 3
+            st.rerun()
+            
+        except Exception as e:
+            st.error(f"❌ AI generation failed: {str(e)}")
+            st.markdown(
+                "Please check your API key in Settings or try again."
+            )
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("🔄 Try Again"):
+                    st.rerun()
+            with col2:
+                if st.button("← Back to Edit"):
+                    st.session_state.wizard_step = 1
+                    st.rerun()
+
+
+def render_wizard_step3():
+    """Step 3: Review generated framework and create project."""
+    from modules.project.service import ProjectService
+    
+    st.markdown("#### Step 3: Review & Create")
+    
+    framework = st.session_state.generated_framework
+    data = st.session_state.wizard_data
+    
+    # If we have AI-generated framework, show explanation
+    if framework and framework.source_context:
+        st.success("✅ AI has generated your SEO framework!")
+        
+        # Show explanation in plain English
+        with st.expander("📖 What does this mean?", expanded=True):
+            st.markdown(framework.explanation)
+            st.caption(f"Confidence: {framework.confidence}")
+    
+    st.markdown("---")
+    st.markdown("**Review and edit if needed:**")
+    
+    # Editable form with pre-filled values
+    with st.form("review_project_form"):
+        # Project name
         name = st.text_input(
             "Project Name*",
-            placeholder="e.g., German Visa Site"
+            value=data.get("business_name", ""),
         )
         
+        # Source Context (with help text)
+        st.markdown("**Source Context** - *Who you are and how you make money*")
         source_context = st.text_area(
             "Source Context",
-            placeholder="Who you are and how you make money",
-            help="e.g., 'Visa Consultancy helping people relocate to Germany'"
+            value=(
+                framework.source_context
+                if framework else ""
+            ),
+            height=80,
+            label_visibility="collapsed"
         )
         
+        # Central Entity
+        st.markdown("**Central Entity** - *The main topic of your website*")
         central_entity = st.text_input(
             "Central Entity",
-            placeholder="Main subject of your site",
-            help="e.g., 'Germany'"
+            value=(
+                framework.central_entity
+                if framework else ""
+            ),
+            label_visibility="collapsed"
         )
         
+        # Central Search Intent
+        st.markdown(
+            "**Central Search Intent** - "
+            "*What users want when searching for your topic*"
+        )
         central_search_intent = st.text_area(
             "Central Search Intent",
-            placeholder="What users want to know/do",
-            help="e.g., 'Know and Go to Germany'"
+            value=(
+                framework.central_search_intent
+                if framework else ""
+            ),
+            height=60,
+            label_visibility="collapsed"
         )
         
-        col1, col2 = st.columns(2)
+        # Functional Words
+        st.markdown(
+            "**Functional Words** - "
+            "*Action verbs that connect users to your services*"
+        )
+        functional_words_str = st.text_input(
+            "Functional Words (comma-separated)",
+            value=(
+                ", ".join(framework.functional_words)
+                if framework and framework.functional_words else ""
+            ),
+            label_visibility="collapsed",
+            placeholder="e.g., get, apply, learn, find, compare"
+        )
+        
+        # Parse functional words
+        functional_words = [
+            w.strip() for w in functional_words_str.split(",")
+            if w.strip()
+        ]
+        
+        st.markdown("---")
+        
+        col1, col2, col3 = st.columns(3)
+        
         with col1:
-            submitted = st.form_submit_button(
-                "Create Project",
-                use_container_width=True,
-                type="primary"
-            )
-        with col2:
-            cancelled = st.form_submit_button(
-                "Cancel",
+            back_clicked = st.form_submit_button(
+                "← Back to Edit",
                 use_container_width=True
             )
         
-        if submitted and name:
+        with col2:
+            regenerate = st.form_submit_button(
+                "🔄 Regenerate",
+                use_container_width=True
+            )
+        
+        with col3:
+            create_clicked = st.form_submit_button(
+                "✅ Create Project",
+                type="primary",
+                use_container_width=True
+            )
+        
+        if back_clicked:
+            st.session_state.wizard_step = 1
+            st.rerun()
+        
+        if regenerate:
+            st.session_state.wizard_step = 2
+            st.session_state.generated_framework = None
+            st.rerun()
+        
+        if create_clicked and name:
             try:
                 project_service = ProjectService()
                 new_project = project_service.create_project(
@@ -290,18 +583,25 @@ def render_create_project_form():
                     source_context=source_context or None,
                     central_entity=central_entity or None,
                     central_search_intent=central_search_intent or None,
+                    functional_words=functional_words or None,
                 )
+                
+                # Reset wizard state
+                st.session_state.wizard_step = 1
+                st.session_state.wizard_data = {}
+                st.session_state.generated_framework = None
+                st.session_state.show_create_project = False
+                
+                # Set new project as current
                 st.session_state.current_project_id = new_project["id"]
                 st.session_state.current_project = new_project
-                st.session_state.show_create_project = False
-                st.success(f"Created project: {name}")
+                
+                st.success(f"🎉 Created project: {name}")
+                st.balloons()
                 st.rerun()
+                
             except Exception as e:
                 st.error(f"Error creating project: {e}")
-        
-        if cancelled:
-            st.session_state.show_create_project = False
-            st.rerun()
 
 
 def render_quick_stats():
